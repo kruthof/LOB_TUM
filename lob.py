@@ -48,21 +48,35 @@ def safe_rerun():
     else:
         st.experimental_rerun()
 
-# --- NLP SETUP ---
-try:
+## --- NLP SETUP (ROBUST VERSION) ---
+@st.cache_resource
+def load_spacy_model():
+    """
+    Loads the spaCy model safely for Streamlit Cloud.
+    Uses caching so it doesn't reload on every button press.
+    """
     import spacy
-
+    
     try:
-        # We load the small model installed via requirements.txt
-        nlp = spacy.load("en_core_web_sm")
+        # METHOD 1: Try loading by standard string name
+        return spacy.load("en_core_web_sm")
     except OSError:
-        # Fallback if specific link failed (rare)
-        from spacy.cli import download
-        download("en_core_web_sm")
-        nlp = spacy.load("en_core_web_sm")
-except Exception as e:
-    nlp = None
-    print(f"SpaCy error: {e}")
+        try:
+            # METHOD 2: Fallback - Import as a python module (Cloud-friendly)
+            # This works if requirements.txt installed the wheel correctly
+            import en_core_web_sm
+            return en_core_web_sm.load()
+        except ImportError:
+            # METHOD 3: Last resort - Download explicitly inside the script
+            # Note: This is slower on first run
+            from spacy.cli import download
+            download("en_core_web_sm")
+            return spacy.load("en_core_web_sm")
+    except Exception as e:
+        st.error(f"Critical NLP Error: {e}")
+        return None
+
+nlp = load_spacy_model()
 
 # Optional providers
 try:
