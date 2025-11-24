@@ -51,18 +51,15 @@ def safe_rerun():
 # --- NLP SETUP ---
 try:
     import spacy
-    from spacy.cli import download
+
     try:
-        if not spacy.util.is_package("en_core_web_lg"):
-            print("Downloading spaCy large model...")
-            download("en_core_web_lg")
-        nlp = spacy.load("en_core_web_lg")
-    except:
-        try:
-            nlp = spacy.load("en_core_web_sm")
-        except:
-            download("en_core_web_sm")
-            nlp = spacy.load("en_core_web_sm")
+        # We load the small model installed via requirements.txt
+        nlp = spacy.load("en_core_web_sm")
+    except OSError:
+        # Fallback if specific link failed (rare)
+        from spacy.cli import download
+        download("en_core_web_sm")
+        nlp = spacy.load("en_core_web_sm")
 except Exception as e:
     nlp = None
     print(f"SpaCy error: {e}")

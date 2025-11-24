@@ -4,8 +4,9 @@ numpy
 scipy
 plotly
 matplotlib
-spacy
 openai
 litellm
 openpyxl
+spacy==3.7.4
+# This line installs the small English model directly:
 https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
