@@ -77,13 +77,69 @@ ALL_MASK_CATEGORIES = list(MASKING_DEFINITIONS.keys())
 
 # Diagnostic Feedback Messages
 BIAS_FEEDBACK_MESSAGES = {
-    "Time": "Potential **Temporal Leakage**. The model relies on dates, possibly accessing future knowledge (e.g. 2008 crash).",
-    "Organizations": "Potential **Reputation Bias**. The model relies on company names, possibly using external knowledge of their success.",
-    "Numbers": "**Magnitude Bias**. Financial figures are influencing the score excessively.",
-    "Locations": "**Geographic Bias**. The model treats regions differently.",
-    "Person Names": "**Authority Bias**. Specific individuals are swaying the analysis.",
-    "Gender": "CRITICAL **Social Bias**. Gendered pronouns are altering the sentiment score.",
-    "Products": "**Product Bias**. Specific brands are influencing the result."
+    "Time": (
+        "### ⚠️ Temporal Leakage (Time Bias)\n\n"
+        "**The Problem:** LLMs are trained on historical data. If a document mentions a specific date (e.g., 'September 2008'), "
+        "the model 'remembers' what happened next (the crash) instead of analyzing the text objectively.\n\n"
+        "**Risk:** The model performs artificially well on backtests but fails in production because it cannot know the future in real-time.\n\n"
+        "**Recommendation:**\n"
+        "* **Data Fix:** Replace specific dates with relative markers (e.g., replace '2020' with 'Year X').\n"
+        "* **Prompt Fix:** Instruct the model to ignore year references and assume a 'timeless vacuum'."
+    ),
+    "Organizations": (
+        "### ⚠️ Reputation Bias\n\n"
+        "**The Problem:** The model knows the long-term fate of famous companies. It may assign a positive score to 'Apple' "
+        "simply because it knows Apple became successful, ignoring specific risks mentioned in the text.\n\n"
+        "**Risk:** The model is trading on brand recognition, not the content of the filing or news article.\n\n"
+        "**Recommendation:**\n"
+        "* **Data Fix:** Anonymize entities. Replace names with generic tokens like `[COMPANY_A]`.\n"
+        "* **Prompt Fix:** Tell the model to treat all companies as unknown, hypothetical entities."
+    ),
+    "Numbers": (
+        "### ⚠️ Magnitude Bias\n\n"
+        "**The Problem:** LLMs often rely on heuristics, assuming 'large numbers' (Billions) are automatically 'Good' or 'Bad' "
+        "depending on context, regardless of whether the number represents profit, debt, or a fine.\n\n"
+        "**Risk:** The model ignores the semantic sentiment (the words) and just looks for the biggest number on the page.\n\n"
+        "**Recommendation:**\n"
+        "* **Data Fix:** Normalize financial figures (e.g., convert raw numbers to `% change`) or mask them with `[NUM]`.\n"
+        "* **Prompt Fix:** Instruct the model to focus on qualitative descriptors (e.g., 'disappointing', 'strong') rather than digits."
+    ),
+    "Locations": (
+        "### ⚠️ Geographic Bias\n\n"
+        "**The Problem:** LLMs contain sociological biases about specific regions. A startup in 'Silicon Valley' might be scored "
+        "more positively than one in a region associated with economic instability, solely based on the location name.\n\n"
+        "**Risk:** You might miss opportunities in emerging markets or undervalue assets in specific regions due to prejudice.\n\n"
+        "**Recommendation:**\n"
+        "* **Data Fix:** Mask locations with `[LOCATION]`.\n"
+        "* **Prompt Fix:** Explicitly instruct the model to ignore geographic context."
+    ),
+    "Person Names": (
+        "### ⚠️ Authority Bias (The 'Halo Effect')\n\n"
+        "**The Problem:** If a text quotes a celebrity CEO or famous investor (e.g., Buffett, Musk), the model may assign a "
+        "positive score simply because it associates that person with success, ignoring what they actually said.\n\n"
+        "**Risk:** The model acts as a fanboy rather than an objective analyst.\n\n"
+        "**Recommendation:**\n"
+        "* **Data Fix:** Replace specific names with titles (e.g., change 'Mark Zuckerberg' to 'The CEO').\n"
+        "* **Prompt Fix:** Instruct the model to evaluate the statement objectively, regardless of the speaker's fame."
+    ),
+    "Gender": (
+        "### ⛔ Social Bias (Critical Fairness Issue)\n\n"
+        "**The Problem:** Research shows LLMs can assign lower competence scores to text containing female pronouns ('she/her') "
+        "compared to male pronouns in business contexts, or stereotype certain industries.\n\n"
+        "**Risk:** Ethical & Legal risk. Your model is making decisions based on gender rather than merit.\n\n"
+        "**Recommendation:**\n"
+        "* **Data Fix:** Neutralize the text. Replace 'He/She' with 'They' or 'The Executive'.\n"
+        "* **Prompt Fix:** Maintain strict gender neutrality. Do not allow the gender of the subject to influence the sentiment."
+    ),
+    "Products": (
+        "### ⚠️ Outcome Bias (Product Bias)\n\n"
+        "**The Problem:** The model knows which products succeeded (iPhone) and which failed (Zune). It cannot objectively "
+        "evaluate a historical review because it has access to future knowledge of the product's fate.\n\n"
+        "**Risk:** Hindsight bias. The model cannot simulate the uncertainty of the moment the text was written.\n\n"
+        "**Recommendation:**\n"
+        "* **Data Fix:** Replace product names with 'The Product' or 'Device A'.\n"
+        "* **Prompt Fix:** Evaluate the product solely on the features described, ignoring external knowledge of market success."
+    )
 }
 
 # NLP & Regex Configuration
