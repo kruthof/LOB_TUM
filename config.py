@@ -4,7 +4,7 @@ Configuration file for Look-Ahead Bias Lab.
 Contains global constants, regex patterns, model lists, and threshold settings.
 """
 
-APP_VERSION = "0.982"
+APP_VERSION = "0.991"
 OUTPUT_DIR = "outputs"
 
 # Random Seed for reproducibility

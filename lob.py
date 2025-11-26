@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Look-Ahead Bias Lab v0.982 - Detailed Reporting & Fixes
+Look-Ahead Bias Lab v0.991 - Detailed Reporting & Fixes
 Updates:
   - Step 4: Detailed table showing Found Docs vs. Used Docs (Capped).
   - Cost: Explicitly includes Output tokens in calculation.
@@ -372,9 +372,9 @@ def generate_debiased_prompt(original_prompt, significant_categories):
 # ------------------------------
 # STREAMLIT UI
 # ------------------------------
-st.set_page_config(page_title="Lab v0.982", layout="wide")
+st.set_page_config(page_title="Lab v0.991", layout="wide")
 if os.path.exists("img/logo_tum.jpeg"): st.sidebar.image("img/logo_tum.jpeg")
-st.title("Look-Ahead Bias Lab (v0.982)")
+st.title("Look-Ahead Bias Lab (v0.991)")
 
 # --- INTRODUCTORY TEXT ---
 st.markdown(f"""
@@ -471,7 +471,7 @@ API keys entered here are transmitted to the Streamlit server for execution.
 While this app does not permanently store your keys, sending credentials over the internet always carries some risk.
 
 **For sensitive data or enterprise use:** We strongly recommend running this tool locally.
-[Download Source Code from GitHub](https://github.com/YourRepo/LookAheadBiasLab)
+[Download Source Code from GitHub](https://github.com/kruthof/LOB_TUM)
 """)
 
 c1, c2 = st.columns(2)
