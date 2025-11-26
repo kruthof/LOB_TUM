@@ -21,6 +21,7 @@ MAX_SUBSET_SIZE = 50         # Maximum docs per category (randomly sampled if ex
 # --- PRICING TABLE (Est. $ per 1M tokens as of late 2024/2025) ---
 # Format: "Model Name": (Input Price, Output Price)
 PRICING_TABLE = {
+    "gpt-5.1": (1.25, 10.00),
     "gpt-4o": (2.50, 10.00),
     "gpt-4o-mini": (0.15, 0.60),
     "gpt-4-turbo": (10.00, 30.00),
@@ -42,6 +43,7 @@ PRICING_TABLE = {
 # --- AVAILABLE MODELS ---
 MODEL_OPTIONS = {
     "OpenAI": [
+        "gpt-5.1",
         "gpt-4o", 
         "gpt-4o-mini", 
         "gpt-4-turbo", 

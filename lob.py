@@ -37,6 +37,17 @@ except ImportError:
     st.error("Critical Error: 'config.py' not found. Please ensure it exists in the same directory.")
     st.stop()
 
+try:
+    from popups import *
+except ImportError:
+    st.error("Critical Error: 'popups.py' not found. Please ensure it exists in the same directory.")
+    st.stop()
+
+try:
+    from masking_recommendation import generate_remediation_prompt, generate_remediation_code
+except ImportError:
+    st.error("Warning: 'masking_recommendation.py' not found.")
+    st.stop()
 # Ensure output directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -49,7 +60,7 @@ def safe_rerun():
         st.experimental_rerun()
 
 ## --- NLP SETUP (ROBUST VERSION) ---
-@st.cache_resource
+#@st.cache_resource
 def load_spacy_model():
     """
     Loads the spaCy model safely for Streamlit Cloud.
@@ -89,6 +100,19 @@ try:
     litellm.suppress_debug_info = True
 except Exception:
     litellm = None
+
+import streamlit.components.v1 as components
+
+def reload_button(label="Reload app"):
+    if st.button(label):
+        components.html(
+            """
+            <script>
+                location.reload();
+            </script>
+            """,
+            height=0,
+        )
 
 # ------------------------------
 # Data structures
@@ -205,20 +229,26 @@ def mask_text_deterministic(text: str, category: str) -> str:
         masked_text = "".join(text_chars)
         
     return masked_text
-
 # ------------------------------
 # 3. Analysis & Inference (Self-Healing)
 # ------------------------------
 
-def run_analysis_batch(batch_docs, provider, text_col, prompt_q):
+def run_analysis_batch(batch_docs, provider, text_col, prompt_q, min_val, max_val):
+    """
+    Now accepts min_val and max_val to instruct the LLM on the valid output range.
+    """
     batch_results = []
-    prompt_txt = f"Task: {prompt_q}\n\n"
+    
+    # Inject the range instruction into the prompt
+    prompt_txt = f"Task: {prompt_q}\n"
+    prompt_txt += f"Constraint: Determine a specific float signal between {min_val} and {max_val}.\n\n"
     
     for idx, row in enumerate(batch_docs):
         txt_content = str(row[text_col]).replace("\n", " ")[:2000]
         prompt_txt += f"--- Doc {idx} ID:{row['doc_id']} ---\n{txt_content}\n"
     
-    prompt_txt += "\nOUTPUT: JSON array of objects [{'doc_id': '...', 'signal': float 0-1}]"
+    # Strict JSON formatting instruction with dynamic range
+    prompt_txt += f"\nOUTPUT: JSON array of objects [{{'doc_id': '...', 'signal': float between {min_val} and {max_val}}}]"
     
     try:
         res = provider.infer({"system": "Analyst.", "user": prompt_txt})
@@ -232,14 +262,18 @@ def run_analysis_batch(batch_docs, provider, text_col, prompt_q):
         return []
     return []
 
-def run_analysis_on_subset(df_subset, provider, text_col, prompt_q):
+def run_analysis_on_subset(df_subset, provider, text_col, prompt_q, min_val, max_val):
+    """
+    Passes min_val/max_val down to the batch runner.
+    """
     final_results_map = {} 
     all_docs = df_subset.to_dict('records')
     
     # Pass 1
     for i in range(0, len(all_docs), 20):
         batch = all_docs[i:i+20]
-        data = run_analysis_batch(batch, provider, text_col, prompt_q)
+        # Pass the range args here
+        data = run_analysis_batch(batch, provider, text_col, prompt_q, min_val, max_val)
         for item in data:
             if 'doc_id' in item and 'signal' in item:
                 try: final_results_map[str(item['doc_id'])] = float(item['signal'])
@@ -251,7 +285,8 @@ def run_analysis_on_subset(df_subset, provider, text_col, prompt_q):
         print(f"Repairing {len(missing)} docs...")
         for i in range(0, len(missing), 5):
             batch = missing[i:i+5]
-            data = run_analysis_batch(batch, provider, text_col, prompt_q)
+            # Pass the range args here
+            data = run_analysis_batch(batch, provider, text_col, prompt_q, min_val, max_val)
             for item in data:
                 if 'doc_id' in item and 'signal' in item:
                     try: final_results_map[str(item['doc_id'])] = float(item['signal'])
@@ -342,25 +377,51 @@ if os.path.exists("img/logo_tum.jpeg"): st.sidebar.image("img/logo_tum.jpeg")
 st.title("Look-Ahead Bias Lab (v0.982)")
 
 # --- INTRODUCTORY TEXT ---
-st.markdown("""
+st.markdown(f"""
 ### Do not use this tool! for internal use only!
 ### 🛡️ Look-Ahead Bias Detection for Binary Classification
 This tool is designed to stress-test **Binary Classification** tasks (e.g., Positive/Negative, Buy/Sell) or other **2-Class Problems** where the output can be expressed as a **Score [0.0 - 1.0]**.
 
 **How it works:**
 1.  **Upload Corpus:** Load your text data (News, Filings, Transcripts).
-2.  **Entity Detection:** The system uses local NLP to find documents containing **Time, Organizations, Numbers, Locations, Person Names, Gender, and Products**.
-3.  **Targeted Masking:** It creates "masked" versions of your text where specific information is hidden (using deterministic spaCy + Regex patterns).
-4.  **Score Comparison:** It runs your prompt on both the **Original** and **Masked** text using your chosen LLM.
-5.  **Bias Diagnosis:** If the score shifts significantly when information is hidden (e.g., removing dates changes the score), the model likely has Look-Ahead Bias.
+2.  **Language Support:** The tool is optimized for **English** text documents.
+3.  **Entity Detection:** The system uses local NLP to find documents containing **Time, Organizations, Numbers, Locations, Person Names, Gender, and Products**.
+4.  **Significance Filter:** To ensure statistical validity, a category is only investigated if it appears in **at least 30 documents**.""") 
+power_analysis_popup()
+st.markdown(f"""
+5.  **Targeted Masking:** It creates "masked" versions of your text where specific information is hidden (using deterministic spaCy + Regex patterns).
+6.  **Score Comparison:** It runs your prompt on both the **Original** and **Masked** text using your chosen LLM.
+7.  **Bias Diagnosis:** If the score shifts significantly when information is hidden (e.g., removing dates changes the score), the model likely has Look-Ahead Bias.
 """)
 
 # --- STEP 1: UPLOAD ---
 st.header("Step 1: Upload Dataset")
-uploaded = st.file_uploader("Upload Corpus (CSV/Parquet)", type=['csv', 'parquet'])
+# Added 'xlsx' and 'xls' to allowed types
+uploaded = st.file_uploader("Upload Corpus", type=['csv', 'parquet', 'xlsx', 'xls'])
 
 if uploaded:
-    df_in = pd.read_csv(uploaded) if uploaded.name.endswith('.csv') else pd.read_parquet(uploaded)
+    try:
+        filename = uploaded.name.lower()
+        
+        # 1. Handle Excel
+        if filename.endswith(('.xlsx', '.xls')):
+            # Requires 'openpyxl' to be installed
+            df_in = pd.read_excel(uploaded)
+            
+        # 2. Handle Parquet
+        elif filename.endswith('.parquet'):
+            df_in = pd.read_parquet(uploaded)
+            
+        # 3. Handle CSV (Comma OR Semicolon)
+        else:
+            # engine='python' with sep=None allows pandas to auto-detect 
+            # delimiters like ',' or ';'
+            df_in = pd.read_csv(uploaded, sep=None, engine='python')
+            
+    except Exception as e:
+        st.error(f"Error reading file. Make sure it is a valid CSV, Excel, or Parquet file.\nDetails: {e}")
+        st.stop()
+
     st.write("Preview of uploaded data (first 3 rows):", df_in.head(3))
     
     c1, c2, c3 = st.columns(3)
@@ -370,29 +431,37 @@ if uploaded:
     df_raw['text'] = df_in[text_col].astype(str)
     df_raw['doc_id'] = df_in.index.astype(str)
     df_raw['timestamp'] = "N/A"
-    
 
-    
     st.success(f"✅ Loaded {len(df_raw)} documents.")
 
-    
     with st.expander("🔎 Inspect First Document (Full Text)"):
         st.write(df_raw.iloc[0]['text'])
 else:
     df_raw = pd.DataFrame({"doc_id":["1"],"timestamp":["N/A"],"text":["Sample Apple Q4 report 2023."]})
     st.info("Upload a file to begin.")
 
+
+
 # --- STEP 2: CONFIG ---
-st.header("Step 2: Define Question")
-st.info("""
+st.header("Step 2: Define Question & Scoring Range")
+
+c1, c2 = st.columns(2)
+min_score = c1.number_input("Minimum Possible Score", value=0.0, step=0.1)
+max_score = c2.number_input("Maximum Possible Score", value=1.0, step=0.1)
+
+if min_score >= max_score:
+    st.error("Error: Minimum score must be lower than Maximum score.")
+
+st.info(f"""
 **📝 Prompt Guidelines:**
-Your prompt MUST request a **floating point score between 0.0 and 1.0**.
-* **Good:** "What is the sentiment score between 0 (Negative) and 1 (Positive)?"
-* **Good:** "Rate the hawkishness from 0 to 1."
+Your prompt MUST request a **floating point score between {min_score} and {max_score}**.
+* **Good:** "Rate the hawkishness from {min_score} to {max_score}."
 * **Bad:** "Is this positive? Answer Yes or No." (Statistical tests require continuous scores).
 """)
-user_prompt = st.text_area("Prompt", "What is the sentiment score between 0.0 (Negative) and 1.0 (Positive)?")
 
+# Default prompt updated to reflect dynamic variables
+default_prompt = f"What is the sentiment score between {min_score} (Negative) and {max_score} (Positive)?"
+user_prompt = st.text_area("Prompt", value=default_prompt)
 # --- STEP 3: PROVIDER ---
 st.header("Step 3: Configure LLM")
 
@@ -411,8 +480,8 @@ model_name = c2.selectbox("Model", MODEL_OPTIONS[prov_name])
 api_key = st.text_input("API Key", type="password")
 
 # --- STEP 4: SCAN & ESTIMATE ---
-st.header("Step 4: Scan & Estimate Cost")
-
+st.header("Step 4: Scan & Estimate Cost ")
+st.info("This step does not trigger API costs. It only estimates the cost of the analysis.")
 if 'subsets' not in st.session_state:
     st.session_state['subsets'] = None
 
@@ -439,6 +508,7 @@ if st.button("🕵️ Scan Corpus & Estimate Cost"):
 # --- STEP 5: RUN ---
 if st.session_state.get('scan_complete'):
     st.header("Step 5: Run Analysis")
+    
     if st.button("🚀 Execute Analysis (Charge API)"):
         if not api_key and prov_name != "Mock":
             st.error("Enter API Key.")
@@ -454,36 +524,57 @@ if st.session_state.get('scan_complete'):
             elif prov_name=="Gemini": prov = LiteLLMProvider(cfg)
             else: prov = MockProvider(cfg)
             
-            # Run Loop
             subsets = st.session_state['subsets']
             results_container = []
-            prog = st.progress(0)
-            status = st.empty()
-            
             active_cats = [k for k,v in subsets.items() if len(v) >= MIN_DOCS_THRESHOLD]
             
-            for i, cat in enumerate(active_cats):
-                df_sub = subsets[cat]
-                status.markdown(f"### 🔄 Analyzing: **{cat}** ({len(df_sub)} docs)")
+            # --- VISUAL FEEDBACK START ---
+            # 1. Create a placeholder for the text label
+            status_text = st.empty()
+            status_text.text("Starting analysis...")
+            
+            # 2. Create the progress bar (without the 'text' argument)
+            prog = st.progress(0)
+            
+            # 3. Wrap processing in spinner
+            with st.spinner("🧠 Processing documents..."):
                 
-                # Mask
-                df_sub[f"text_masked_{cat}"] = df_sub["text"].apply(lambda x: mask_text_deterministic(x, cat))
+                for i, cat in enumerate(active_cats):
+                    df_sub = subsets[cat]
+                    
+                    # Update the text placeholder manually
+                    status_text.text(f"Analyzing Category: {cat} ({i+1}/{len(active_cats)})")
+                    
+                    # Update the progress bar (float only)
+                    prog.progress(i / len(active_cats))
+                    
+                    # Mask
+                    df_sub[f"text_masked_{cat}"] = df_sub["text"].apply(lambda x: mask_text_deterministic(x, cat))
+                    
+                    # Analyze Original
+                    # PASS min_score and max_score
+                    r_orig = run_analysis_on_subset(df_sub, prov, "text", user_prompt, min_score, max_score)
+                    r_orig['version'] = 'Original'; r_orig['category_group'] = cat
+                    
+                    # Analyze Masked
+                    # PASS min_score and max_score
+                    r_mask = run_analysis_on_subset(df_sub, prov, f"text_masked_{cat}", user_prompt, min_score, max_score)
+                    r_mask['version'] = 'Masked'; r_mask['category_group'] = cat
+                    
+                    results_container.append(pd.concat([r_orig, r_mask]))
+                    st.session_state[f"subset_{cat}"] = df_sub
                 
-                # Analyze
-                r_orig = run_analysis_on_subset(df_sub, prov, "text", user_prompt)
-                r_orig['version'] = 'Original'; r_orig['category_group'] = cat
+                # Finalize
+                status_text.text("Analysis Complete!")
+                prog.progress(1.0)
                 
-                r_mask = run_analysis_on_subset(df_sub, prov, f"text_masked_{cat}", user_prompt)
-                r_mask['version'] = 'Masked'; r_mask['category_group'] = cat
-                
-                results_container.append(pd.concat([r_orig, r_mask]))
-                st.session_state[f"subset_{cat}"] = df_sub
-                prog.progress((i+1)/len(active_cats))
-                
+            # --- VISUAL FEEDBACK END ---
+
             if results_container:
                 st.session_state['final_results'] = pd.concat(results_container).dropna()
                 st.success("Analysis Complete!")
-                safe_rerun() # Fixed for older Streamlit
+                time.sleep(1) 
+                safe_rerun()
 
 # --- RESULTS ---
 if 'final_results' in st.session_state:
@@ -501,17 +592,46 @@ if 'final_results' in st.session_state:
             sig = p < 0.05
             if sig: sig_cats.append(cat)
             stats.append({
-                "Category": cat, "N": len(piv),
-                "Orig": f"{piv['Original'].mean():.3f}", "Mask": f"{piv['Masked'].mean():.3f}",
-                "P-Val": f"{p:.4f}", "Bias?": "⚠️ YES" if sig else "✅ No"
+                "Category": cat, "Sample Size": len(piv),
+                "Mean Value Original": f"{piv['Original'].mean():.3f}", "Mean Value Masked": f"{piv['Masked'].mean():.3f}",
+                "P-Value": f"{p:.4f}", "Bias?": "⚠️ YES" if sig else "✅ No"
             })
             
     st.table(pd.DataFrame(stats))
+    # <--- INSERT THE NEW INFO BLOCK HERE --->
+    st.info("""
+        **👉 Note on Interpretation:** Finding "no significant bias" does not strictly prove that your model is bias-free. 
+        It simply means that, based on the **specific subset of documents analyzed** and the statistical thresholds applied ($p < 0.05$), there is **insufficient evidence** to conclude that bias exists. 
+        Bias may still reside in edge cases or unexamined parts of the dataset.
+        """)
+    
+    # ... inside if 'final_results' in st.session_state:
     
     if sig_cats:
         st.error(f"Bias found in: {', '.join(sig_cats)}")
         for c in sig_cats: st.warning(f"**{c}**: {BIAS_FEEDBACK_MESSAGES.get(c,'')}")
-        st.text_area("Recommended Prompt", generate_debiased_prompt(user_prompt, sig_cats))
+        
+        # --- START NEW INTEGRATION ---
+        st.markdown("---")
+        st.subheader("🛠️ Recommended Remediation")
+        
+        c1, c2 = st.columns(2)
+        
+        with c1:
+                st.markdown("### Option 1: LLM-Based Masking")
+                st.caption("Copy this prompt into ChatGPT/Claude along with your data to generate a clean dataset.")
+                # Generates the instruction to REWRITE the text
+                rec_prompt = generate_remediation_prompt(user_prompt, sig_cats)
+                st.code(rec_prompt, language="text")
+            
+        with c2:
+            st.markdown("### Option 2: Pre-processing (Python)")
+            st.caption("Use this Python function in your pipeline to strip the biased entities.")
+            # Call function 2
+            rec_code = generate_remediation_code(sig_cats)
+            st.code(rec_code, language="python")
+        # --- END NEW INTEGRATION ---
+        
     else:
         st.success("No significant bias detected.")
         
