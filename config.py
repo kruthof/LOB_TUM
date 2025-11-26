@@ -15,7 +15,7 @@ BATCH_SIZE_DEFAULT = 100
 USE_BATCHING_DEFAULT = True
 
 # SAFETY RAILS
-MIN_DOCS_THRESHOLD = 5       # Minimum docs required to run stats
+MIN_DOCS_THRESHOLD = 30       # Minimum docs required to run stats
 MAX_SUBSET_SIZE = 50         # Maximum docs per category (randomly sampled if exceeded)
 
 # --- PRICING TABLE (Est. $ per 1M tokens as of late 2024/2025) ---
