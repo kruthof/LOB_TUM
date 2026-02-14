@@ -159,9 +159,6 @@ class LiteLLMProvider(ModelProvider):
             except Exception as e: time.sleep(1); last_err=e
         return f"Error: {last_err}"
 
-class MockProvider(ModelProvider):
-    def infer(self, prompt): return f"Signal: {np.random.rand():.3f}\nMock."
-
 # ------------------------------
 # 1. NLP & Subset Logic
 # ------------------------------
@@ -510,19 +507,17 @@ if st.session_state.get('scan_complete'):
     st.header("Step 5: Run Analysis")
     
     if st.button("🚀 Execute Analysis (Charge API)"):
-        if not api_key and prov_name != "Mock":
+        if not api_key:
             st.error("Enter API Key.")
         else:
             # Setup Provider
             if prov_name=="OpenAI": os.environ["OPENAI_API_KEY"] = api_key
             if prov_name=="Claude": os.environ["ANTHROPIC_API_KEY"] = api_key
-            if prov_name=="Gemini": os.environ["GOOGLE_API_KEY"] = api_key
             
             cfg = ProviderConfig("main", prov_name.lower(), model_name)
             if prov_name=="OpenAI": prov = OpenAIProvider(cfg)
             elif prov_name=="Claude": prov = LiteLLMProvider(cfg)
-            elif prov_name=="Gemini": prov = LiteLLMProvider(cfg)
-            else: prov = MockProvider(cfg)
+            else: st.error(f"Unknown provider: {prov_name}"); st.stop()
             
             subsets = st.session_state['subsets']
             results_container = []

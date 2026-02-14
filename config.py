@@ -15,7 +15,7 @@ BATCH_SIZE_DEFAULT = 100
 USE_BATCHING_DEFAULT = True
 
 # SAFETY RAILS
-MIN_DOCS_THRESHOLD = 30       # Minimum docs required to run stats
+MIN_DOCS_THRESHOLD = 5       # Minimum docs required to run stats
 MAX_SUBSET_SIZE = 50         # Maximum docs per category (randomly sampled if exceeded)
 
 # --- PRICING TABLE (Est. $ per 1M tokens as of late 2024/2025) ---
@@ -27,14 +27,8 @@ PRICING_TABLE = {
     "gpt-4-turbo": (10.00, 30.00),
     "gpt-3.5-turbo": (0.50, 1.50),
     
-    # Anthropic
-    "claude-3-5-sonnet-20240620": (3.00, 15.00),
-    "claude-3-5-haiku-20241022": (1.00, 5.00),
-    "claude-3-opus-20240229": (15.00, 75.00),
-    
-    # Gemini
-    "gemini/gemini-1.5-pro": (1.25, 5.00),
-    "gemini/gemini-1.5-flash": (0.075, 0.30),
+    # Anthropic (litellm requires "anthropic/" prefix)
+    "anthropic/claude-3-5-haiku-20241022": (0.80, 4.00),
     
     # Fallback
     "default": (1.00, 2.00)
@@ -50,17 +44,8 @@ MODEL_OPTIONS = {
         "gpt-3.5-turbo"
     ],
     "Claude": [
-        "claude-3-5-sonnet-20240620", 
-        "claude-3-5-haiku-20241022", 
-        "claude-3-opus-20240229"
+        "anthropic/claude-3-5-haiku-20241022"
     ],
-    "Gemini": [
-        "gemini/gemini-1.5-pro", 
-        "gemini/gemini-1.5-flash"
-    ],
-    "Mock": [
-        "mock-model-v1"
-    ]
 }
 
 # Detailed instructions for the LLM to ensure aggressive masking
