@@ -375,7 +375,7 @@ st.title("Look-Ahead Bias Lab (v0.991)")
 
 # --- INTRODUCTORY TEXT ---
 st.markdown(f"""
-### Experimental stage, please report any bugs that you discover!
+### Experimental stage, please report any bugs that you discover to lookaheadbias{at}mgt.tum.de ! 
 ### 🛡️ Look-Ahead Bias Detection for Binary Classification
 This tool is designed to stress-test **Binary Classification** tasks (e.g., Positive/Negative, Buy/Sell) or other **2-Class Problems** where the output can be expressed as a **Score [0.0 - 1.0]**.
 
